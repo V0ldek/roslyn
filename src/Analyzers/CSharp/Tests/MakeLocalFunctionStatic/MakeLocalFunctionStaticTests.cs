@@ -396,5 +396,33 @@ class C
 }}",
 parseOptions: CSharp8ParseOptions);
         }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsMakeLocalFunctionStatic)]
+        public async Task TestMissingIfCallsOtherLocalCapturingStruct()
+        {
+            await TestMissingAsync(
+    @"using System;
+
+class C
+{
+    struct S1
+    {
+        S2 f1;
+    }
+    struct S2
+    {
+        int f2;
+    }
+
+    void M(S1 p)
+    {
+        LocalFunction2();
+
+        void LocalFunction1() => Console.WriteLine(p);
+
+        void [||]LocalFunction2() => LocalFunction1();
+    }
+}", parameters: new TestParameters(parseOptions: CSharp8ParseOptions));
+        }
     }
 }

@@ -41,14 +41,46 @@ namespace Microsoft.CodeAnalysis.CSharp
             // Start at slot 1 (slot 0 just indicates reachability)
             for (int slot = 1; slot < reads.Capacity; slot++)
             {
+                var symbol = variableBySlot[slot].Symbol;
+
                 if (reads[slot])
                 {
-                    var symbol = variableBySlot[slot].Symbol;
                     CheckIfAssignedDuringLocalFunctionReplay(symbol, syntax, slot);
+                }
+                else if (CheckCaptureOfPiecewiseTrackedStruct(symbol, reads, slot))
+                {
+                    CheckCaptured(symbol);
                 }
             }
 
             base.VisitLocalFunctionUse(localFunc, localFunctionState, syntax, isCall);
+        }
+
+        /// <summary>
+        /// Check if the symbol is a piecewise tracked struct whose fields were read.
+        /// If yes, capture the symbol.
+        /// </summary>
+        private bool CheckCaptureOfPiecewiseTrackedStruct(Symbol symbol, BitVector reads, int slot)
+        {
+            if (reads[slot])
+            {
+                return true;
+            }
+
+            var type = symbol.GetTypeOrReturnType().Type;
+            if (EmptyStructTypeCache.IsTrackableStructType(type))
+            {
+                foreach (var field in _emptyStructTypeCache.GetStructInstanceFields(type))
+                {
+                    int fieldSlot = GetOrCreateSlot(field, slot);
+                    if (fieldSlot > 0 && CheckCaptureOfPiecewiseTrackedStruct(field, reads, fieldSlot))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
